@@ -1,6 +1,6 @@
 // CUANDO SUBAS A RENDER, CAMBIA ESTA URL
 // const API_URL = '';
-const API_URL = 'http://127.0.0.1:4000';
+const API_URL = 'https://agile-prestamos.onrender.com';
 
 let emailClienteSeleccionado = null;
 
