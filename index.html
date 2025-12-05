@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Agile Préstamos - Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-top: 30px; }
+    .seccion { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+    label { display: block; margin-top: 5px; }
+    input, select, button { margin-top: 5px; padding: 5px; }
+    .oculto { display: none; }
+    #resultado { white-space: pre; background: #f8f8f8; padding: 10px; margin-top: 10px; max-height: 200px; overflow: auto; }
+  </style>
+</head>
+<body>
+
+  <h1>Agile Préstamos</h1>
+
+  <!-- LOGIN -->
+  <div class="seccion" id="seccion-login">
+    <h2>Inicio de sesión</h2>
+    <label>Usuario:
+      <input type="text" id="login-usuario">
+    </label>
+    <label>Contraseña:
+      <input type="password" id="login-password">
+    </label>
+    <button onclick="iniciarSesion()">Ingresar</button>
+    <button onclick="recuperarContrasena()">¿Olvidaste tu contraseña?</button>
+    <div id="login-msg"></div>
+  </div>
+
+  <!-- CONTENIDO PRINCIPAL (se muestra solo si hay sesión) -->
+  <div id="app" class="oculto">
+
+    <!-- CLIENTES -->
+    <div class="seccion">
+      <h2>1. Cliente desde DNI (API Decolecta)</h2>
+      <label>Tipo:
+        <select id="cliente-tipo">
+          <option value="NATURAL">NATURAL</option>
+          <option value="JURIDICA">JURIDICA</option>
+        </select>
+      </label>
+      <label>DNI / RUC:
+        <input type="text" id="cliente-doc">
+      </label>
+      <label>Email:
+        <input type="email" id="cliente-email">
+      </label>
+      <label>Teléfono:
+        <input type="text" id="cliente-tel">
+      </label>
+      <button onclick="crearClienteDesdeApi()">Crear cliente</button>
+    </div>
+
+    <!-- PRESTAMOS -->
+    <div class="seccion">
+      <h2>2. Crear préstamo y ver cronograma</h2>
+      <label>ID Cliente:
+        <input type="number" id="prestamo-cliente-id">
+      </label>
+      <label>Monto total:
+        <input type="number" id="prestamo-monto" step="0.01">
+      </label>
+      <label>Nro de cuotas:
+        <input type="number" id="prestamo-cuotas">
+      </label>
+      <button onclick="crearPrestamo()">Crear préstamo</button>
+
+      <h3>Ver préstamo de cliente</h3>
+      <label>ID Cliente:
+        <input type="number" id="ver-cliente-id">
+      </label>
+      <button onclick="verPrestamoCliente()">Ver préstamo + cuotas</button>
+    </div>
+
+    <!-- PAGOS -->
+    <div class="seccion">
+      <h2>3. Pagos de cuota</h2>
+      <label>ID Cuota:
+        <input type="number" id="pago-cuota-id">
+      </label>
+      <label>Monto a pagar:
+        <input type="number" id="pago-monto" step="0.01">
+      </label>
+      <label>Medio de pago:
+        <select id="pago-medio">
+          <option value="EFECTIVO">EFECTIVO</option>
+          <option value="TARJETA">TARJETA</option>
+          <option value="YAPE">YAPE</option>
+          <option value="PLIN">PLIN</option>
+        </select>
+      </label>
+      <button onclick="registrarPago()">Pagar cuota</button>
+
+      <h3>Historial de pagos por cuota</h3>
+      <label>ID Cuota:
+        <input type="number" id="hist-cuota-id">
+      </label>
+      <button onclick="verHistorialPagos()">Ver historial</button>
+    </div>
+
+    <!-- CAJA -->
+    <div class="seccion">
+      <h2>4. Caja</h2>
+      <h3>Apertura</h3>
+      <label>Monto inicial:
+        <input type="number" id="caja-inicial" step="0.01" value="100">
+      </label>
+      <button onclick="abrirCaja()">Abrir caja</button>
+
+      <h3>Resumen de hoy</h3>
+      <button onclick="resumenCaja()">Ver resumen</button>
+
+      <h3>Cierre</h3>
+      <label>Total real contado:
+        <input type="number" id="caja-total-real" step="0.01">
+      </label>
+      <button onclick="cerrarCaja()">Cerrar caja</button>
+    </div>
+
+    <div class="seccion">
+      <h2>Salida consola</h2>
+      <div id="resultado"></div>
+    </div>
+
+  </div>
+
+    <script>
+    const API_URL = 'http://127.0.0.1:3000';
+    let emailClienteSeleccionado = null;
+
+    function log(obj) {
+      const div = document.getElementById('resultado');
+      div.textContent = JSON.stringify(obj, null, 2);
+    }
+
+    // LOGIN SIMPLIFICADO (usuario fijo para demo)
+    function iniciarSesion() {
+      const u = document.getElementById('login-usuario').value;
+      const p = document.getElementById('login-password').value;
+      const msg = document.getElementById('login-msg');
+
+      if (u === 'admin' && p === '1234') {
+        msg.textContent = 'Ingreso exitoso';
+        document.getElementById('seccion-login').classList.add('oculto');
+        document.getElementById('app').classList.remove('oculto');
+      } else {
+        msg.textContent = 'Usuario o contraseña incorrectos (prueba admin / 1234)';
+      }
+    }
+
+    function recuperarContrasena() {
+      const u = document.getElementById('login-usuario').value || '(sin usuario)';
+      alert('Simulación: se enviaría un enlace de recuperación al correo asociado al usuario ' + u);
+    }
+
+        // 1. CLIENTES: primero buscar en BD, luego API
+    async function crearClienteDesdeApi() {
+      const tipo = document.getElementById('cliente-tipo').value;
+      const doc = document.getElementById('cliente-doc').value;
+      const email = document.getElementById('cliente-email').value;
+      const tel = document.getElementById('cliente-tel').value;
+
+      try {
+        const res = await fetch(API_URL + '/clientes/buscar-o-crear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tipo, documento: doc, email, telefono: tel })
+        });
+        const data = await res.json();
+        log(data);
+      } catch (err) {
+        log({ error: err.message });
+      }
+    }
+
+    // 2. PRESTAMOS
+    async function crearPrestamo() {
+      const cliente_id = Number(document.getElementById('prestamo-cliente-id').value);
+      const monto_total = Number(document.getElementById('prestamo-monto').value);
+      const num_cuotas = Number(document.getElementById('prestamo-cuotas').value);
+
+      try {
+        const res = await fetch(API_URL + '/prestamos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cliente_id, monto_total, num_cuotas })
+        });
+        const data = await res.json();
+        log(data);
+      } catch (err) {
+        log({ error: err.message });
+      }
+    }
+
+    async function verPrestamoCliente() {
+      const cliente_id = Number(document.getElementById('ver-cliente-id').value);
+      try {
+        const res = await fetch(API_URL + '/prestamos/cliente/' + cliente_id);
+        const data = await res.json();
+
+        if (data.prestamo) {
+          emailClienteSeleccionado = data.prestamo.cliente_email || null;
+
+          const cuotas = data.cuotas || [];
+          const lines = cuotas.map(c =>
+            `Cuota ${c.numero_cuota} | id=${c.id} | vence=${c.fecha_vencimiento} | saldo=${c.saldo_pendiente}`
+          ).join('\n');
+
+          document.getElementById('resultado').textContent =
+            JSON.stringify(data.prestamo, null, 2) + '\n\nCRONOGRAMA:\n' + lines;
+        } else {
+          log(data);
+        }
+      } catch (err) {
+        log({ error: err.message });
+      }
+    }
+
+    // 3. PAGOS
+        async function registrarPago() {
+      const cuota_id = Number(document.getElementById('pago-cuota-id').value);
+      const monto_pagado = Number(document.getElementById('pago-monto').value);
+      const medio_pago = document.getElementById('pago-medio').value;
+
+      try {
+        const cuerpo = {
+          cuota_id,
+          monto_pagado,
+          medio_pago
+        };
+
+        if (emailClienteSeleccionado) {
+          cuerpo.canal_comprobante = 'EMAIL';
+          cuerpo.email = emailClienteSeleccionado;
+        }
+
+        const res = await fetch(API_URL + '/pagos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cuerpo)
+        });
+        const data = await res.json();
+        log(data);
+      } catch (err) {
+        log({ error: err.message });
+      }
+    }
+    
+    // 4. CAJA
+    async function abrirCaja() {
+      const monto_inicial = Number(document.getElementById('caja-inicial').value);
+      try {
+        const res = await fetch(API_URL + '/caja/apertura', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ monto_inicial })
+        });
+        const data = await res.json();
+        log(data);
+      } catch (err) {
+        log({ error: err.message });
+      }
+    }
+
+        async function resumenCaja() {
+      try {
+        const res = await fetch(API_URL + '/caja/resumen-actual');
+        const data = await res.json();
+        log(data);
+        if (data.total_teorico != null) {
+          document.getElementById('caja-total-real').value = data.total_teorico;
+        }
+      } catch (err) {
+        log({ error: err.message });
+      }
+    }
+
+    async function cerrarCaja() {
+      const total_real = Number(document.getElementById('caja-total-real').value);
+      try {
+        const res = await fetch(API_URL + '/caja/cierre', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ total_real })
+        });
+        const data = await res.json();
+        log(data);
+      } catch (err) {
+        log({ error: err.message });
+      }
+    }
+  </script>
+</body>
+</html>
