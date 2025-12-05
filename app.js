@@ -1,5 +1,5 @@
-// CUANDO SUBAS A RENDER, CAMBIA ESTA URL
-// const API_URL = '';
+// CUANDO SE SUBA A RENDER, CAMBIA ESTA URL
+// const API_URL = 'https://agile-prestamos.onrender.com';
 const API_URL = 'https://agile-prestamos.onrender.com';
 
 let emailClienteSeleccionado = null;
